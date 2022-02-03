@@ -15,6 +15,8 @@ from qiskit.algorithms.optimizers import SPSA
 from qiskit.circuit.library import ZFeatureMap, ZZFeatureMap, PauliFeatureMap, TwoLocal
 #from qiskit_machine_learning.kernels import QuantumKernel
 from qiskit_machine_learning.neural_networks import CircuitQNN, OpflowQNN
+from qiskit_machine_learning.utils.loss_functions import L2Loss, CrossEntropyLoss
+from qiskit_machine_learning.algorithms.classifiers import NeuralNetworkClassifier
 
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
@@ -80,5 +82,42 @@ output = qnn.forward(x_train[0], weights)   #Forward pass
 _, update = qnn.backward(x_train[0], weights)   #Backward pass
 
 #Training Section
+
+#One hot encoding. If you want to know about this encoding, pls google. It is not an arbitrary encoding method, it is used a lot in ML
+def get_one_hot_encoding(y):
+    unique_labels = np.unique(y, axis=0)
+    y_one_hot = [(np.eye(len(unique_labels))[np.where(unique_labels == y_i)]).reshape(len(unique_labels)) for y_i in y]
+
+    return np.array(y_one_hot)
+
+y_train_1h = get_one_hot_encoding(y_train)
+y_test_1h = get_one_hot_encoding(y_test)
+
+#This function can create a checkpoint in case we hit the optimal point before the maximum iteration is reached. It is unused right now.
+def callback(nfev, params, fval, stepsize, accepted=None):
+    global loss_recorder
+
+    loss_recorder.append(fval)
+    print(f'{nfev} - {fval}')
+
+#Neural network classification
+n_iterations = 50
+spsa_opt = SPSA(maxiter=n_iterations, callback=callback)
+loss_recorder = []
+initial_point = np.random.random((len(ansatz.parameters),))
+vqc = NeuralNetworkClassifier(neural_network=qnn,
+                            loss=CrossEntropyLoss(),
+                            one_hot=True,
+                            optimizer=spsa_opt,
+                            initial_point=initial_point)
+
+x_train_norm = np.array([x/np.linalg.norm(x) for x in x_train])     #Normalizes data set. Why is it necessary? We may want to ask.
+
+vqc = vqc.fit(x_train_norm, y_train_1h)
+
+score_train = vqc.score(x_train, y_train_1h)
+score_test = vqc.score(x_test, y_test_1h)
+print(f'Score on the training set: {score_train}')
+print(f'Score on the test set {score_test}')
 
 
