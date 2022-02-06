@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"name": "TeamMagic8",
+			"path": "."
+		}
+	],
+	"settings": {
+		"git.ignoreLimitWarning": true
+	}
+}
